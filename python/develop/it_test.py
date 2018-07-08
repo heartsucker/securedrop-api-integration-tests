@@ -2,17 +2,20 @@
 
 from argparse import ArgumentParser
 from os import path
+from pyotp import TOTP
 
-from securedrop_api.client import Client, UserPassOtp
+from securedrop_api.auth import UserPassOtp
+from securedrop_api.client import Client
 
 
 def main():
-    parser = ArguentParser(path.basename(__file__))
-    paser.add_argument('--source-url', required=True)
-    paser.add_argument('--journo-url', required=True)
+    parser = ArgumentParser(path.basename(__file__))
+    parser.add_argument('--source-url', required=True)
+    parser.add_argument('--journo-url', required=True)
     args = parser.parse_args()
 
-    auth = UserPassOtp('', '', '')
+    totp = TOTP('JHCOGO7VCER3EJ4L')
+    auth = UserPassOtp('journalist', 'WEjwn8ZyczDhQSK24YKM8C9a', totp.now())
     client = Client(args.source_url, auth)
 
 

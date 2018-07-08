@@ -1,7 +1,11 @@
 import attr
+import requests
 import subprocess
+import time
 
+from os import path
 from typing import List
+from requests.exceptions import ConnectionError
 
 """
 Tests are done as a subset of the cross product of:
@@ -35,8 +39,12 @@ Old versions of the SDK may not have to support new versions of the language.
 @attr.s
 class SecureDropVersion:
     version = attr.ib(type=str)
-    run_cmd = attr.ib(type=List[str])
-    run_dir = attr.ib(type=str)
+
+    def run_cmd(self, code_dir: str) -> None:
+        raise NotImplementedError
+
+    def kill_cmd(self, code_dir: str) -> None:
+        raise NotImplementedError
 
 
 @attr.s
@@ -60,7 +68,47 @@ class Sdk:
             raise NotImplementedError('Unknown SDK type: {}'.format(self.name))
 
 
-sd_develop = SecureDropVersion('develop', ['make', 'dev'], 'securedrop')
+class SecureDropVersionDevelop(SecureDropVersion):
+
+    def __init__(self, *nargs, **kwargs) -> None:
+        super().__init__('develop')
+        self.__docker_hash = None
+
+    def run_cmd(self, code_dir: str) -> None:
+        tag = 'securedrop-api/integration-test:{}'.format(self.version)
+        cmd = ['docker', 'build', '--tag', tag, '.']
+        subprocess.check_call(cmd, cwd=path.join(code_dir, 'securedrop'))
+
+        cmd = [
+            'docker', 'run', '-t', '-d',
+            '--expose', '8080', '--expose', '8081',
+            '--publish', '127.0.0.1:8080:8080', '--publish', '127.0.0.1:8081:8081',
+            '-v', code_dir + '/securedrop:/src', '-w', '/src',
+            tag, 'bin/run',
+        ]
+        self.__docker_hash = subprocess.check_output(cmd).decode('utf-8').strip()
+
+        attempts = 30
+        while True:
+            try:
+                attempts -= 1
+                requests.get('http://localhost:8081/api/v1')
+                break
+            except ConnectionError as e:
+                if attempts <= 0:
+                    raise e
+                else:
+                    print('Waiting for server to boot.')        
+                    time.sleep(1)
+
+
+    def kill_cmd(self, _code_dir: str) -> None:
+        if self.__docker_hash is not None:
+            cmd = ['docker', 'rm', '-f', self.__docker_hash]
+            subprocess.check_output(cmd)
+
+
+sd_develop = SecureDropVersionDevelop()
 
 SDKS = [
     Sdk(

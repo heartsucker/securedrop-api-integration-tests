@@ -1,6 +1,5 @@
 import fcntl
 import os
-import socket
 import subprocess
 import sys
 
@@ -105,9 +104,7 @@ def run_test(sdk: Sdk,
              sd_version: SecureDropVersion) -> None:
     sdk.fetch_lang_version(lang_version)
 
-    with live_server(sd_version.version,
-                     sd_version.run_cmd,
-                     sd_version.run_dir) as (source_url, journo_url):
+    with live_server(sd_version) as (source_url, journo_url):
         test_dir = path.join(ROOT, sdk.name, sdk_version.version)
         cmd = [
             './test.sh',
@@ -142,31 +139,21 @@ def get_source_code(repo: str) -> None:
 
 
 @contextmanager
-def live_server(version: str, cmd: List[str], cwd: str) -> (str, str):
+def live_server(sd_version: SecureDropVersion) -> (str, str):
     info('Booting server.')
     # "clean" the repo
     subprocess.check_call(['git', 'checkout', '--', '.'], cwd=SOURCE_CODE)
 
     # the get version we want
-    subprocess.check_call(['git', 'checkout', version], cwd=SOURCE_CODE)
+    subprocess.check_call(['git', 'checkout', sd_version.version], cwd=SOURCE_CODE)
+    subprocess.check_call(['git', 'pull'], cwd=SOURCE_CODE)
 
     # run the dev server
-    proc = subprocess.Popen(cmd, cwd=path.join(SOURCE_CODE, cwd))
-
-    # wait for the server to start listening
-    while True:
-        if proc.poll() is not None:
-            raise Error('Failed to start the server.')
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = sock.connect_ex(('127.0.0.1', 8080))
-        if result == 0:
-            info('Live server booted.')
-            break
-
-    yield ('http://localhost:8080', 'http://localhost:8081')
-
-    proc.terminate()
+    try:
+        sd_version.run_cmd(SOURCE_CODE)
+        yield ('http://localhost:8080', 'http://localhost:8081')
+    finally:
+        sd_version.kill_cmd(SOURCE_CODE)
 
 
 def arg_parser() -> ArgumentParser:
