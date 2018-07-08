@@ -1,0 +1,6 @@
+*.pyc
+
+venv
+
+# workspace for test resources
+.workspace/
