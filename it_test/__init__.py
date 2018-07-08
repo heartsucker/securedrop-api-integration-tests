@@ -7,12 +7,21 @@ import sys
 from argparse import ArgumentParser
 from contextlib import contextmanager
 from os import path
+from typing import List
 
-from .sdk import SDKS
+from .sdk import SDKS, Sdk, SdkVersion, SecureDropVersion
 
 REPO_URL = 'https://github.com/freedomofpress/securedrop.git'
-WORKSPACE = path.abspath(path.join(path.dirname(__file__), os.pardir, '.workspace'))
+ROOT = path.abspath(path.join(path.dirname(__file__), os.pardir))
+WORKSPACE = path.join(ROOT, '.workspace')
 SOURCE_CODE = path.join(WORKSPACE, 'securedrop')
+
+ALL_TESTS = ['{}:{}:{}:{}'.format(
+                sdk.name, sdk_version.version, lang_version, sd_version.version)
+             for sdk in SDKS
+             for sdk_version in sdk.versions
+             for sd_version in sdk_version.sd_versions
+             for lang_version in sdk_version.lang_versions]
 
 
 def colorize(msg, color, bold=False):
@@ -77,11 +86,36 @@ def _main() -> None:
 
     with acquire_lock():
         if args.fetch:
-            get_source_code(args.repo) 
+            get_source_code(args.repo)
 
-        for test in args.test:
+        for test in (args.test or ALL_TESTS):
             (sdk, sdk_version, lang_version, sd_version) = test.split(':')
-            raise NotImplementedError('TODO')
+
+            # lazy search
+            (sdk,) = [x for x in SDKS if x.name == sdk]
+            (sdk_version, ) = [x for x in sdk.versions if x.version == sdk_version]
+            (sd_version, ) = [x for x in sdk_version.sd_versions if x.version == sd_version]
+
+            run_test(sdk, sdk_version, lang_version, sd_version)
+
+
+def run_test(sdk: Sdk,
+             sdk_version: SdkVersion,
+             lang_version: str,
+             sd_version: SecureDropVersion) -> None:
+    sdk.fetch_lang_version(lang_version)
+
+    with live_server(sd_version.version,
+                     sd_version.run_cmd,
+                     sd_version.run_dir) as (source_url, journo_url):
+        test_dir = path.join(ROOT, sdk.name, sdk_version.version)
+        cmd = [
+            './test.sh',
+            lang_version,
+            source_url,
+            journo_url,
+        ]
+        subprocess.check_call(cmd, cwd=test_dir)
 
 
 @contextmanager
@@ -90,7 +124,7 @@ def acquire_lock() -> None:
         try:
             fcntl.flock(f, fcntl.LOCK_EX)
         except (OSError, IOError):
-            error('Failed to acquire lock. Are test tests already running?')
+            error('Failed to acquire lock. Are the tests already running?')
         yield
 
 
@@ -108,7 +142,7 @@ def get_source_code(repo: str) -> None:
 
 
 @contextmanager
-def live_server(version: str) -> (str, str):
+def live_server(version: str, cmd: List[str], cwd: str) -> (str, str):
     info('Booting server.')
     # "clean" the repo
     subprocess.check_call(['git', 'checkout', '--', '.'], cwd=SOURCE_CODE)
@@ -117,7 +151,7 @@ def live_server(version: str) -> (str, str):
     subprocess.check_call(['git', 'checkout', version], cwd=SOURCE_CODE)
 
     # run the dev server
-    proc = subprocess.Popen(['make', 'dev'], cwd=path.join(SOURCE_CODE, 'securedrop'))
+    proc = subprocess.Popen(cmd, cwd=path.join(SOURCE_CODE, cwd))
 
     # wait for the server to start listening
     while True:
@@ -135,29 +169,15 @@ def live_server(version: str) -> (str, str):
     proc.terminate()
 
 
-def run_test_rust(version: str, source_url: str, journo_url: str) -> None:
-    pass
-
-
-def run_test_python(version: str, source_url: str, journo_url: str) -> None:
-    pass
-
-
 def arg_parser() -> ArgumentParser:
-    all_tests = ['{}:{}:{}:{}'.format(
-                    sdk.name, sdk_version.version, lang_version, sd_version.version)
-                 for sdk in SDKS
-                 for sdk_version in sdk.versions
-                 for sd_version in sdk_version.sd_versions
-                 for lang_version in sdk_version.lang_versions]
 
     parser = ArgumentParser('it-test',
                             description='Run the SecureDrop API integration tests.')
     parser.add_argument('-t', '--test',
                         help=('Tests to run (format sdk:sdk_version:lang_version:sd_version) '
                               '(Default: all)'),
-                        default=all_tests,
-                        choices=all_tests,
+                        default=[],
+                        choices=ALL_TESTS,
                         action='append')
     parser.add_argument('-r', '--repo',
                         help='SecureDrop git repo (Default: {})'.format(REPO_URL),

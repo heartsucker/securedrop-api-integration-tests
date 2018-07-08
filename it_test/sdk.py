@@ -1,4 +1,5 @@
 import attr
+import subprocess
 
 from typing import List
 
@@ -50,11 +51,11 @@ class Sdk:
     name = attr.ib(type=str)
     versions = attr.ib(type=List[SdkVersion])
 
-    def fetch_lang_version(self, version: str) -> None:
+    def fetch_lang_version(self, lang_version: str) -> None:
         if self.name == 'python':
-            subprocess.check_call(['pyenv', 'install', version])
+            subprocess.check_call(['pyenv', 'install', '-s', lang_version])
         elif self.name == 'rust':
-            subprocess.check_call(['rustup', 'toolchain', 'install', version])
+            subprocess.check_call(['rustup', 'toolchain', 'install', lang_version])
         else:
             raise NotImplementedError('Unknown SDK type: {}'.format(self.name))
 

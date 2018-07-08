@@ -1,0 +1,8 @@
+[package]
+name = "test"
+version = "0.0.0"
+authors = ["heartsucker <heartsucker@autistici.org>"]
+publish = false
+
+[dependencies]
+securedrop-api = { git = "https://github.com/heartsucker/rust-securedrop-api.git", branch = "develop" }

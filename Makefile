@@ -20,7 +20,7 @@ venv:
 update: ## Update the requirements
 	@pip-compile --no-header --generate-hashes -o requirements.txt requirements.in
 
-.PHONY: check 
+.PHONY: check
 check: ## Run the linters
 	@. $(VENV)/bin/activate && \
 		flake8 it_test
