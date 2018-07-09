@@ -6,9 +6,9 @@ import sys
 from argparse import ArgumentParser
 from contextlib import contextmanager
 from os import path
-from typing import List
 
 from .sdk import SDKS, Sdk, SdkVersion, SecureDropVersion
+from .utils import error, warn, info, success
 
 REPO_URL = 'https://github.com/freedomofpress/securedrop.git'
 ROOT = path.abspath(path.join(path.dirname(__file__), os.pardir))
@@ -21,48 +21,6 @@ ALL_TESTS = ['{}:{}:{}:{}'.format(
              for sdk_version in sdk.versions
              for sd_version in sdk_version.sd_versions
              for lang_version in sdk_version.lang_versions]
-
-
-def colorize(msg, color, bold=False):
-    shell_colors = {
-        'gray': '30',
-        'red': '31',
-        'green': '32',
-        'yellow': '33',
-        'blue': '34',
-        'magenta': '35',
-        'cyan': '36',
-        'white': '37',
-        'crimson': '38',
-        'highlighted_red': '41',
-        'highlighted_green': '42',
-        'highlighted_brown': '43',
-        'highlighted_blue': '44',
-        'highlighted_magenta': '45',
-        'highlighted_cyan': '46',
-        'highlighted_gray': '47',
-        'highlighted_crimson': '48'
-    }
-    attrs = [shell_colors[color]]
-    if bold:
-        attrs.append('1')
-    return '\x1b[{}m{}\x1b[0m'.format(';'.join(attrs), msg)
-
-
-def error(msg) -> None:
-    print(colorize(msg, 'red', True))
-
-
-def warn(msg) -> None:
-    print(colorize(msg, 'yellow', True))
-
-
-def info(msg) -> None:
-    print(colorize(msg, 'blue', True))
-
-
-def success(msg) -> None:
-    print(colorize(msg, 'green', True))
 
 
 class Error(Exception):
@@ -83,6 +41,7 @@ def main() -> None:
 def _main() -> None:
     args = arg_parser().parse_args()
 
+    init()
     with acquire_lock():
         if args.fetch:
             get_source_code(args.repo)
@@ -96,6 +55,7 @@ def _main() -> None:
             (sd_version, ) = [x for x in sdk_version.sd_versions if x.version == sd_version]
 
             run_test(sdk, sdk_version, lang_version, sd_version)
+            success('Success for {}'.format(test))
 
 
 def run_test(sdk: Sdk,
@@ -115,23 +75,25 @@ def run_test(sdk: Sdk,
         subprocess.check_call(cmd, cwd=test_dir)
 
 
+def init() -> None:
+    if not path.exists(WORKSPACE):
+        os.makedirs(WORKSPACE)
+    elif not path.isdir(WORKSPACE):
+        raise Error('Not a directory: {}'.format(WORKSPACE))
+
+
 @contextmanager
 def acquire_lock() -> None:
     with open(path.join(WORKSPACE, 'lock'), 'w') as f:
         try:
             fcntl.flock(f, fcntl.LOCK_EX)
         except (OSError, IOError):
-            error('Failed to acquire lock. Are the tests already running?')
+            raise Error('Failed to acquire lock. Are the tests already running?')
         yield
 
 
 def get_source_code(repo: str) -> None:
     info('Fetching source code.')
-    if not path.exists(WORKSPACE):
-        os.makedirs(WORKSPACE)
-    elif not path.isdir(WORKSPACE):
-        raise Error('Not a directory: {}'.format(WORKSPACE))
-
     if path.exists(SOURCE_CODE):
         subprocess.check_call(['git', 'fetch'], cwd=SOURCE_CODE)
     else:

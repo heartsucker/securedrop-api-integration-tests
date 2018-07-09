@@ -21,11 +21,11 @@ update: ## Update the requirements
 	@pip-compile --no-header --generate-hashes -o requirements.txt requirements.in
 
 .PHONY: check
-check: ## Run the linters
+check: venv ## Run the linters
 	@. $(VENV)/bin/activate && \
 		flake8 it_test
 
 .PHONY: run
-run: check ## Run the integration tests
+run: venv check ## Run the integration tests
 	@. $(VENV)/bin/activate && \
 		./it-test

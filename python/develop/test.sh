@@ -9,10 +9,12 @@ declare -r journo_url="$3"
 # because of stupid virtualenv
 set +u
 
+rm -rf venv .python-version
 pyenv local "$lang_version"
-rm -rf venv
+
 virtualenv venv
 source venv/bin/activate
-pip install git+https://github.com/heartsucker/python-securedrop-api.git@develop
-pip install pyotp
+
+pip install -r requirements.txt
+
 ./it_test.py --source-url "$source_url" --journo-url "$journo_url"

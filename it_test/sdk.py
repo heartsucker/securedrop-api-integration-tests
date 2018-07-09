@@ -7,6 +7,8 @@ from os import path
 from typing import List
 from requests.exceptions import ConnectionError
 
+from .utils import info
+
 """
 Tests are done as a subset of the cross product of:
     - SDK name
@@ -71,7 +73,8 @@ class Sdk:
 class SecureDropVersionDevelop(SecureDropVersion):
 
     def __init__(self, *nargs, **kwargs) -> None:
-        super().__init__('develop')
+        # TODO this should be develop
+        super().__init__('journalist-api-0.9.0')
         self.__docker_hash = None
 
     def run_cmd(self, code_dir: str) -> None:
@@ -98,9 +101,8 @@ class SecureDropVersionDevelop(SecureDropVersion):
                 if attempts <= 0:
                     raise e
                 else:
-                    print('Waiting for server to boot.')        
+                    info('Waiting for server to boot.')
                     time.sleep(1)
-
 
     def kill_cmd(self, _code_dir: str) -> None:
         if self.__docker_hash is not None:

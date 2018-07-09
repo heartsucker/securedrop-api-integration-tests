@@ -5,4 +5,5 @@ authors = ["heartsucker <heartsucker@autistici.org>"]
 publish = false
 
 [dependencies]
+oath = "0.10"
 securedrop-api = { git = "https://github.com/heartsucker/rust-securedrop-api.git", branch = "develop" }

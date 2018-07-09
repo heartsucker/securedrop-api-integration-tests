@@ -1,6 +1,9 @@
 *.pyc
-
 venv
+
+# prevent pyenv from locking our python versions because we *actually*
+# want to have the version vary
+.python-version
 
 # workspace for test resources
 .workspace/

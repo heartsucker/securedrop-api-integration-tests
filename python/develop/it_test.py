@@ -16,7 +16,7 @@ def main():
 
     totp = TOTP('JHCOGO7VCER3EJ4L')
     auth = UserPassOtp('journalist', 'WEjwn8ZyczDhQSK24YKM8C9a', totp.now())
-    client = Client(args.source_url, auth)
+    client = Client(args.journo_url, auth)
 
 
 if __name__ == '__main__':
